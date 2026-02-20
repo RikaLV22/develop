@@ -1,0 +1,9 @@
+Rails.application.routes.draw do
+  resources :users, only: [:index, :show, :new, :create, :edit, :update, :destroy]
+    get '/me', to: 'users#me'
+  resources :organizations, only: [:index, :show, :new, :create, :edit, :update, :destroy] do
+    get 'users', to: 'organizations#users'
+  end
+  resources :transactions, only: [:index, :show, :create, :update, :destroy]
+  post "/login", to: "logins#create"
+end

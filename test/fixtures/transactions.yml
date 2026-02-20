@@ -1,0 +1,21 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  user: one
+  organization: one
+  transaction_type: MyString
+  category: MyString
+  amount: 1
+  date: 2026-02-08
+  payment_method: MyString
+  card_number: MyString
+
+two:
+  user: two
+  organization: two
+  transaction_type: MyString
+  category: MyString
+  amount: 1
+  date: 2026-02-08
+  payment_method: MyString
+  card_number: MyString
