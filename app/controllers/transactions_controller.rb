@@ -28,7 +28,9 @@ class TransactionsController < ApplicationController
 
     def update
         if @transaction.update(transaction_params)
-            render json: {errors: @transaction.errors.full_massages},
+            render json: @transaction, status: :ok
+        else
+            render json: {errors: @transaction.errors.full_messages},
                     status: :unprocessable_entity
         end
     end
