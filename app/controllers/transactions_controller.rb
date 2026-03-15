@@ -22,6 +22,7 @@ class TransactionsController < ApplicationController
     if transaction.save
       render json: transaction_json(transaction), status: :created
     else
+      puts transaction.errors.full_messages
       render json: { errors: transaction.errors.full_messages }, status: :unprocessable_entity
     end
   end
@@ -43,7 +44,7 @@ class TransactionsController < ApplicationController
 
   def transaction_json(t)
     t.as_json(
-      except: [:created_at, :updated_at, :organization_id, :user_id]
+      except: [:created_at, :updated_at, :organization_id,]
     )
     .merge(
       user_name: t.user&.username || "不明"
