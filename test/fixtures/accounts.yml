@@ -1,0 +1,11 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  bank: one
+  account_number: MyString
+  decimal: MyString
+
+two:
+  bank: two
+  account_number: MyString
+  decimal: MyString

@@ -10,7 +10,25 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_08_071907) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_20_104254) do
+  create_table "accounts", charset: "utf8mb3", force: :cascade do |t|
+    t.string "account_number"
+    t.decimal "balance", precision: 10
+    t.bigint "bank_id", null: false
+    t.datetime "created_at", null: false
+    t.string "decimal"
+    t.datetime "updated_at", null: false
+    t.index ["bank_id"], name: "index_accounts_on_bank_id"
+  end
+
+  create_table "banks", charset: "utf8mb3", force: :cascade do |t|
+    t.string "bank"
+    t.string "code"
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.datetime "updated_at", null: false
+  end
+
   create_table "organizations", charset: "utf8mb3", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name"
@@ -41,6 +59,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_08_071907) do
     t.index ["organization_id"], name: "index_users_on_organization_id"
   end
 
+  add_foreign_key "accounts", "banks"
   add_foreign_key "transactions", "organizations"
   add_foreign_key "transactions", "users"
   add_foreign_key "users", "organizations"

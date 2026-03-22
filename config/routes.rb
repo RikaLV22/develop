@@ -6,4 +6,8 @@ Rails.application.routes.draw do
   end
   resources :transactions, only: [:index, :show, :create, :update, :destroy]
   post "/login", to: "logins#create"
+  resources :accounts, only: [:index, :show, :create] do
+    patch 'add_balance', on: :member
+  end
+  resources :banks, only: [:index]
 end
