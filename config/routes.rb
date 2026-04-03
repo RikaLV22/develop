@@ -8,6 +8,7 @@ Rails.application.routes.draw do
   post "/login", to: "logins#create"
   resources :accounts, only: [:index, :show, :create] do
     patch 'add_balance', on: :member
+    patch 'subtract_balance', on: :member
   end
   resources :banks, only: [:index]
 end

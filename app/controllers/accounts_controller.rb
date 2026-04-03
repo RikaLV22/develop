@@ -33,6 +33,19 @@ class AccountsController < ApplicationController
     end
   end
 
+
+  def subtract_balance
+    account = Account.find(params[:id])
+    amount = params[:amount].to_f
+    account.balance -= amount
+
+    if account.save
+      render json: account.as_json(include: :bank)
+    else
+      render json: { errors: account.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def account_params
