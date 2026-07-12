@@ -53,3 +53,4 @@ gem 'mysql2'
 gem 'rack-cors'
 gem 'active_model_serializers', '~> 0.10.13'
 gem 'jwt'
+gem "faraday"

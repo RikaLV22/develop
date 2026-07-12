@@ -12,7 +12,7 @@ class Transaction < ApplicationRecord
     if transaction_type == "income"
       account.increment!(:balance, amount)
     else
-      account.decremant!(:balance, amount)
+      account.decrement!(:balance, amount)
     end
   end
   validates :transaction_type, presence: true

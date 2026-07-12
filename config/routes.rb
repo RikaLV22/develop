@@ -11,4 +11,5 @@ Rails.application.routes.draw do
     patch 'subtract_balance', on: :member
   end
   resources :banks, only: [:index]
+  post "/chat", to: "chat#create"
 end
