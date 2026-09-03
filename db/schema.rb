@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_20_104254) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_03_111857) do
   create_table "accounts", charset: "utf8mb3", force: :cascade do |t|
     t.string "account_number"
     t.decimal "balance", precision: 10
@@ -36,6 +36,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_104254) do
   end
 
   create_table "transactions", charset: "utf8mb3", force: :cascade do |t|
+    t.bigint "account_id"
     t.integer "amount"
     t.string "card_number"
     t.string "category"
@@ -43,10 +44,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_104254) do
     t.date "date"
     t.bigint "organization_id", null: false
     t.string "payment_method"
+    t.string "transaction_scope", default: "organization", null: false
     t.string "transaction_type"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["account_id"], name: "index_transactions_on_account_id"
     t.index ["organization_id"], name: "index_transactions_on_organization_id"
+    t.index ["transaction_scope"], name: "index_transactions_on_transaction_scope"
     t.index ["user_id"], name: "index_transactions_on_user_id"
   end
 
@@ -60,6 +64,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_20_104254) do
   end
 
   add_foreign_key "accounts", "banks"
+  add_foreign_key "transactions", "accounts"
   add_foreign_key "transactions", "organizations"
   add_foreign_key "transactions", "users"
   add_foreign_key "users", "organizations"

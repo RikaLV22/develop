@@ -15,8 +15,14 @@ class Transaction < ApplicationRecord
       account.decrement!(:balance, amount)
     end
   end
+
   validates :transaction_type, presence: true
   validates :category, presence: true
   validates :amount, presence: true
   validates :date, presence: true
+
+  validates :transaction_scope, presence: true
+  validates :transaction_scope, inclusion: {
+    in: %w[organization personal]
+  }
 end
