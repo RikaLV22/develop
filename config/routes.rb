@@ -7,6 +7,7 @@ Rails.application.routes.draw do
   resources :transactions, only: [:index, :show, :create, :update, :destroy] do
     collection do
       get :summary
+      get :history_summary
     end
   end
   post "/login", to: "logins#create"
