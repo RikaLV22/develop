@@ -1,25 +1,11 @@
-class TransactionsController < ApplicationController
+class OrganizationTransactionsController < ApplicationController
   before_action :logged_in_user
 
   def index
     transactions =
-      Transaction
-        .where(
-          organization_id: @current_user.organization_id
-        )
-        .where(
-          transaction_scope:
-            params[:transaction_scope].presence || "organization"
-        )
+      organization_transactions
         .includes(:user)
         .order(date: :desc, id: :desc)
-
-    if params[:transaction_scope] == "personal"
-      transactions =
-        transactions.where(
-          user_id: @current_user.id
-        )
-    end
 
     render json: transactions.as_json(
       include: {
@@ -32,11 +18,7 @@ class TransactionsController < ApplicationController
 
   def show
     transaction =
-      Transaction
-        .where(
-          organization_id: @current_user.organization_id
-        )
-        .find(params[:id])
+      organization_transactions.find(params[:id])
 
     render json: transaction
   end
@@ -44,11 +26,14 @@ class TransactionsController < ApplicationController
   def create
     transaction =
       @current_user.transactions.build(
-        transaction_params
+        organization_transaction_params
       )
 
     transaction.organization_id =
       @current_user.organization_id
+
+    transaction.transaction_scope =
+      "organization"
 
     if transaction.save
       render json: transaction, status: :created
@@ -61,13 +46,11 @@ class TransactionsController < ApplicationController
 
   def update
     transaction =
-      Transaction
-        .where(
-          organization_id: @current_user.organization_id
-        )
-        .find(params[:id])
+      organization_transactions.find(params[:id])
 
-    if transaction.update(transaction_params)
+    if transaction.update(
+      organization_transaction_params
+    )
       render json: transaction
     else
       render json: {
@@ -78,11 +61,7 @@ class TransactionsController < ApplicationController
 
   def destroy
     transaction =
-      Transaction
-        .where(
-          organization_id: @current_user.organization_id
-        )
-        .find(params[:id])
+      organization_transactions.find(params[:id])
 
     transaction.destroy
 
@@ -98,48 +77,32 @@ class TransactionsController < ApplicationController
       params[:year].presence&.to_i ||
       today.year
 
-    organization_transactions =
-      base_organization_transactions
-
-    organization_member_transactions =
-      organization_transactions.where(
-        user_id: @current_user.id
-      )
-
-    personal_transactions =
-      base_organization_transactions
-        .where(
-          transaction_scope: "personal"
-        )
-        .where(
-          user_id: @current_user.id
-        )
+    transactions =
+      organization_transactions
 
     users =
       build_user_summaries(
-        organization_transactions,
+        transactions,
         year,
         today
+      )
+
+    member_transactions =
+      transactions.where(
+        user_id: @current_user.id
       )
 
     render json: {
       organization:
         build_summary(
-          organization_transactions,
+          transactions,
           year,
           today
         ),
 
       organization_member:
         build_summary(
-          organization_member_transactions,
-          year,
-          today
-        ),
-
-      personal:
-        build_summary(
-          personal_transactions,
+          member_transactions,
           year,
           today
         ),
@@ -153,34 +116,27 @@ class TransactionsController < ApplicationController
       params[:year].presence&.to_i ||
       Date.current.year
 
-    organization_transactions =
-      base_organization_transactions
-
-    organization_member_transactions =
-      organization_transactions.where(
-        user_id: @current_user.id
-      )
-
-    personal_transactions =
-      base_organization_transactions
-        .where(
-          transaction_scope: "personal"
-        )
-        .where(
-          user_id: @current_user.id
-        )
+    transactions =
+      organization_transactions
 
     users =
       build_history_users(
-        organization_transactions,
+        transactions,
         year
       )
 
-    transactions =
-      organization_transactions
-        .where(
-          date: year_date_range(year)
-        )
+    member_transactions =
+      transactions.where(
+        user_id: @current_user.id
+      )
+
+    year_transactions =
+      transactions.where(
+        date: year_date_range(year)
+      )
+
+    transaction_list =
+      year_transactions
         .includes(
           :user,
           account: :bank
@@ -190,63 +146,77 @@ class TransactionsController < ApplicationController
           id: :desc
         )
         .map do |transaction|
-          {
-            id: transaction.id,
-            user_name:
-              transaction.user&.username || "不明",
-            transaction_type:
-              transaction.transaction_type,
-            category:
-              transaction.category,
-            amount:
-              transaction.amount,
-            date:
-              transaction.date.to_s,
-            payment_method:
-              transaction.payment_method,
-            card_number:
-              transaction.respond_to?(:card_number) ?
-                transaction.card_number :
-                nil,
-            account_id:
-              transaction.account_id,
-            account_name:
-              transaction.account&.bank&.name,
-            account_number:
-              transaction.account&.account_number
-          }
-        end
+
+      {
+        id: transaction.id,
+
+        user_name:
+          transaction.user&.username || "不明",
+
+        transaction_type:
+          transaction.transaction_type,
+
+        category:
+          transaction.category,
+
+        amount:
+          transaction.amount,
+
+        date:
+          transaction.date.to_s,
+
+        payment_method:
+          transaction.payment_method,
+
+        card_number:
+          transaction.respond_to?(:card_number) ?
+            transaction.card_number :
+            nil,
+
+        account_id:
+          transaction.account_id,
+
+        account_name:
+          transaction.account&.bank&.name,
+
+        account_number:
+          transaction.account&.account_number
+      }
+    end
 
     render json: {
       year: year,
 
       organization:
         build_history_summary(
-          organization_transactions,
+          transactions,
           year
         ),
 
       organization_member:
         build_history_summary(
-          organization_member_transactions,
-          year
-        ),
-
-      personal:
-        build_history_summary(
-          personal_transactions,
+          member_transactions,
           year
         ),
 
       users: users,
 
-      transactions: transactions
+      transactions: transaction_list
     }
   end
 
   private
 
-  def transaction_params
+  def organization_transactions
+    Transaction.where(
+      organization_id:
+        @current_user.organization_id,
+      transaction_scope:
+        "organization"
+    )
+  end
+
+  def organization_transaction_params
     params
       .require(:transaction)
       .permit(
@@ -255,16 +225,16 @@ class TransactionsController < ApplicationController
         :amount,
         :date,
         :payment_method,
-        :account_id,
-        :transaction_scope
+        :account_id
       )
   end
 
-  def base_organization_transactions
-    Transaction.where(
-      organization_id:
-        @current_user.organization_id
-    )
+  def organization_users
+    @organization_users ||=
+      User.where(
+        organization_id:
+          @current_user.organization_id
+      )
   end
 
   def year_date_range(year)
@@ -351,13 +321,13 @@ class TransactionsController < ApplicationController
   end
 
   def build_user_summaries(
-    organization_transactions,
+    transactions,
     year,
     today
   )
     organization_users.map do |user|
       user_transactions =
-        organization_transactions.where(
+        transactions.where(
           user_id: user.id
         )
 
@@ -391,12 +361,12 @@ class TransactionsController < ApplicationController
   end
 
   def build_history_users(
-    organization_transactions,
+    transactions,
     year
   )
     organization_users.map do |user|
       user_transactions =
-        organization_transactions.where(
+        transactions.where(
           user_id: user.id
         )
 
@@ -411,14 +381,6 @@ class TransactionsController < ApplicationController
           )
       }
     end
-  end
-
-  def organization_users
-    @organization_users ||=
-      User.where(
-        organization_id:
-          @current_user.organization_id
-      )
   end
 
   def build_period_summary(

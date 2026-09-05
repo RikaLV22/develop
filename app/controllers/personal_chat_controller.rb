@@ -1,4 +1,4 @@
-class ChatController < ApplicationController
+class PersonalChatController < ApplicationController
   before_action :logged_in_user
 
   def create
@@ -13,11 +13,10 @@ class ChatController < ApplicationController
 
     user = logged_in_user
 
-    transactions = user.transactions
-      .where(
-        organization_id: user.organization_id,
-        transaction_scope: "organization"
-      )
+    # 個人家計簿の取引だけを取得
+    transactions = user.transactions.where(
+      transaction_scope: "personal"
+    )
 
     today = Date.current
 
@@ -28,44 +27,58 @@ class ChatController < ApplicationController
       period_name = "今月"
     elsif message.match?(/先月|先月分/)
       last_month = today.prev_month
+
       transactions = transactions.where(
         date: last_month.beginning_of_month..last_month.end_of_month
       )
+
       period_name = "先月"
     elsif message.match?(/今年|今年分/)
       transactions = transactions.where(
         date: today.beginning_of_year..today.end_of_year
       )
+
       period_name = "今年"
     elsif message.match?(/去年|昨年/)
       last_year = today.prev_year
+
       transactions = transactions.where(
         date: last_year.beginning_of_year..last_year.end_of_year
       )
+
       period_name = "去年"
     else
       period_name = "全期間"
     end
 
-    total_expense = transactions
-      .where(transaction_type: "expense")
-      .sum(:amount)
+    # 収入
+    total_income =
+      transactions
+        .where(transaction_type: "income")
+        .sum(:amount)
 
-    total_income = transactions
-      .where(transaction_type: "income")
-      .sum(:amount)
+    # 支出
+    total_expense =
+      transactions
+        .where(transaction_type: "expense")
+        .sum(:amount)
 
-    category_expense = transactions
-      .where(transaction_type: "expense")
-      .group(:category)
-      .sum(:amount)
+    # カテゴリ別支出
+    category_expense =
+      transactions
+        .where(transaction_type: "expense")
+        .group(:category)
+        .sum(:amount)
 
-    balance = total_income - total_expense
+    # 収支
+    balance =
+      total_income - total_expense
 
-    api_key = Rails.application.credentials.dig(
-      :gemini,
-      :api_key
-    )
+    api_key =
+      Rails.application.credentials.dig(
+        :gemini,
+        :api_key
+      )
 
     if api_key.blank?
       render json: {
@@ -74,21 +87,22 @@ class ChatController < ApplicationController
       return
     end
 
-    category_text = if category_expense.present?
-      category_expense.map do |category, amount|
-        "#{category}: #{amount}円"
-      end.join("\n")
-    else
-      "支出データはありません"
-    end
+    category_text =
+      if category_expense.present?
+        category_expense.map do |category, amount|
+          "#{category}: #{amount}円"
+        end.join("\n")
+      else
+        "支出データはありません"
+      end
 
     prompt = <<~TEXT
-      あなたは家計簿アシスタントです。
+      あなたは個人家計簿アシスタントです。
 
       今回の分析対象期間: #{period_name}
 
-      以下の数字は、現在ログインしているユーザー自身が
-      組織家計簿に登録した取引のうち、
+      以下の数字は、現在ログインしているユーザー自身の
+      個人家計簿に登録された取引のうち、
       #{period_name}に該当するものだけを集計したものです。
 
       【#{period_name}の家計状況】
@@ -102,14 +116,25 @@ class ChatController < ApplicationController
       【ユーザーの質問】
       #{message}
 
-      家計簿情報を正確に参照して、
+      個人家計簿情報を正確に参照して、
       ユーザーの質問に分かりやすく回答してください。
 
-      数値を回答するときは、必ず上記の家計簿情報を使用してください。
-      勝手に数字を推測したり変更したりしないでください。
+      数値を回答するときは、
+      必ず上記の家計簿情報を使用してください。
 
-      「今月」「先月」「今年」など期間が指定されている場合は、
+      勝手に数字を推測したり、
+      変更したりしないでください。
+
+      「今月」「先月」「今年」など
+      期間が指定されている場合は、
       必ず指定された期間のデータだけを使用してください。
+
+      収支を計算する場合は、
+      総収入 - 総支出
+      で計算してください。
+
+      カテゴリー別支出の合計が
+      総支出と一致するか確認したうえで回答してください。
     TEXT
 
     models = [
@@ -134,7 +159,8 @@ class ChatController < ApplicationController
           req.options.timeout = 10
           req.options.open_timeout = 5
 
-          req.headers["Content-Type"] = "application/json"
+          req.headers["Content-Type"] =
+            "application/json"
 
           req.body = {
             contents: [
@@ -157,47 +183,71 @@ class ChatController < ApplicationController
         if response.success?
           body = JSON.parse(response.body)
 
-          reply = body.dig(
-            "candidates",
-            0,
-            "content",
-            "parts",
-            0,
-            "text"
-          )
+          reply =
+            body.dig(
+              "candidates",
+              0,
+              "content",
+              "parts",
+              0,
+              "text"
+            )
 
           break if reply.present?
         end
 
-        if response.status >= 500 && index < models.length - 1
-          puts "Model #{model} failed with status #{response.status}. Switching to #{models[index + 1]}."
+        if response.status >= 500 &&
+           index < models.length - 1
+
+          puts(
+            "Model #{model} failed with status " \
+            "#{response.status}. " \
+            "Switching to #{models[index + 1]}."
+          )
+
           next
         end
 
         break
       rescue Faraday::TimeoutError => e
-        puts "Model #{model} timed out: #{e.message}"
+        puts(
+          "Model #{model} timed out: #{e.message}"
+        )
 
         if index < models.length - 1
-          puts "Switching to #{models[index + 1]}."
+          puts(
+            "Switching to #{models[index + 1]}."
+          )
+
           next
         end
 
         last_status = 504
       rescue Faraday::ConnectionFailed => e
-        puts "Model #{model} connection failed: #{e.message}"
+        puts(
+          "Model #{model} connection failed: " \
+          "#{e.message}"
+        )
 
         if index < models.length - 1
-          puts "Switching to #{models[index + 1]}."
+          puts(
+            "Switching to #{models[index + 1]}."
+          )
+
           next
         end
 
         last_status = 502
       rescue JSON::ParserError => e
-        puts "JSON Parser Error: #{e.message}"
+        puts(
+          "JSON Parser Error: #{e.message}"
+        )
 
         if index < models.length - 1
-          puts "Switching to #{models[index + 1]}."
+          puts(
+            "Switching to #{models[index + 1]}."
+          )
+
           next
         end
       end
@@ -207,11 +257,15 @@ class ChatController < ApplicationController
       case last_status
       when 503
         render json: {
-          error: "現在AIサービスが混雑しています。しばらくしてから再度お試しください。"
+          error:
+            "現在AIサービスが混雑しています。 " \
+            "しばらくしてから再度お試しください。"
         }, status: :bad_gateway
       when 504
         render json: {
-          error: "AIの応答に時間がかかりすぎています。もう一度お試しください。"
+          error:
+            "AIの応答に時間がかかりすぎています。 " \
+            "もう一度お試しください。"
         }, status: :gateway_timeout
       else
         render json: {
@@ -226,7 +280,7 @@ class ChatController < ApplicationController
       reply: reply
     }
   rescue StandardError => e
-    puts "Chat Error: #{e.message}"
+    puts "Personal Chat Error: #{e.message}"
     puts e.backtrace.first(10)
 
     render json: {
