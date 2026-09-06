@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   resources :users, only: [:index, :show, :new, :create, :edit, :update, :destroy]
+  resources :organization_memberships, only: [:index, :create, :destroy]
 
   get '/me', to: 'users#me'
 

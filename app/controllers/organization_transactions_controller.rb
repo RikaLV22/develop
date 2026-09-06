@@ -1,5 +1,5 @@
 class OrganizationTransactionsController < ApplicationController
-  before_action :logged_in_user
+  before_action :logged_in_user, :set_current_organization
 
   def index
     transactions =
@@ -30,7 +30,7 @@ class OrganizationTransactionsController < ApplicationController
       )
 
     transaction.organization_id =
-      @current_user.organization_id
+      @current_organization.id
 
     transaction.transaction_scope =
       "organization"
@@ -207,10 +207,27 @@ class OrganizationTransactionsController < ApplicationController
 
   private
 
+  def set_current_organization
+    organization_id =
+      params[:organization_id].presence ||
+      @current_user.organization_id
+
+    @current_organization =
+      @current_user.organizations.find_by(
+        id: organization_id
+      )
+
+    return if @current_organization
+
+    render json: {
+      error: "所属していない組織です"
+    }, status: :forbidden
+  end
+
   def organization_transactions
     Transaction.where(
       organization_id:
-        @current_user.organization_id,
+        @current_organization.id,
       transaction_scope:
         "organization"
     )
@@ -231,10 +248,7 @@ class OrganizationTransactionsController < ApplicationController
 
   def organization_users
     @organization_users ||=
-      User.where(
-        organization_id:
-          @current_user.organization_id
-      )
+      @current_organization.users
   end
 
   def year_date_range(year)
@@ -265,7 +279,7 @@ class OrganizationTransactionsController < ApplicationController
     {
       total:
         build_period_summary(
-          year_transactions
+          transactions
         ),
 
       current_month:

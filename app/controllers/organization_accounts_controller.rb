@@ -1,5 +1,6 @@
 class OrganizationAccountsController < ApplicationController
   before_action :logged_in_user
+  before_action :set_current_organization
 
   def index
     accounts =
@@ -24,8 +25,9 @@ class OrganizationAccountsController < ApplicationController
 
     account.user_id = nil
     account.organization_id =
-      @current_user.organization_id
-    account.account_scope = "organization"
+      @current_organization.id
+    account.account_scope =
+      "organization"
 
     if account.save
       render json:
@@ -171,11 +173,29 @@ class OrganizationAccountsController < ApplicationController
 
   private
 
+  def set_current_organization
+    organization_id =
+      params[:organization_id].presence ||
+      @current_user.organization_id
+
+    @current_organization =
+      @current_user.organizations.find_by(
+        id: organization_id
+      )
+
+    return if @current_organization
+
+    render json: {
+      error: "所属していない組織です"
+    }, status: :forbidden
+  end
+
   def organization_accounts
     Account.where(
       organization_id:
-        @current_user.organization_id,
-      account_scope: "organization"
+        @current_organization.id,
+      account_scope:
+        "organization"
     )
   end
 
@@ -184,7 +204,7 @@ class OrganizationAccountsController < ApplicationController
       account.transactions
             .where(
               organization_id:
-                @current_user.organization_id,
+                @current_organization.id,
               transaction_scope:
                 "organization"
             )
@@ -200,7 +220,7 @@ class OrganizationAccountsController < ApplicationController
       transaction_count:
         account.transactions.where(
           organization_id:
-            @current_user.organization_id,
+            @current_organization.id,
           transaction_scope:
             "organization"
         ).count,
