@@ -77,6 +77,10 @@ class PersonalTransactionsController < ApplicationController
       params[:year].presence&.to_i ||
       today.year
 
+    period =
+      params[:period].presence ||
+      "all"
+
     transactions =
       personal_transactions
 
@@ -85,7 +89,8 @@ class PersonalTransactionsController < ApplicationController
         build_summary(
           transactions,
           year,
-          today
+          today,
+          period
         )
     }
   end
@@ -100,7 +105,8 @@ class PersonalTransactionsController < ApplicationController
 
     year_transactions =
       transactions.where(
-        date: year_date_range(year)
+        date:
+          year_date_range(year)
       )
 
     transaction_list =
@@ -114,46 +120,47 @@ class PersonalTransactionsController < ApplicationController
           id: :desc
         )
         .map do |transaction|
+          {
+            id:
+              transaction.id,
 
-      {
-        id: transaction.id,
+            user_name:
+              transaction.user&.username || "不明",
 
-        user_name:
-          transaction.user&.username || "不明",
+            transaction_type:
+              transaction.transaction_type,
 
-        transaction_type:
-          transaction.transaction_type,
+            category:
+              transaction.category,
 
-        category:
-          transaction.category,
+            amount:
+              transaction.amount,
 
-        amount:
-          transaction.amount,
+            date:
+              transaction.date.to_s,
 
-        date:
-          transaction.date.to_s,
+            payment_method:
+              transaction.payment_method,
 
-        payment_method:
-          transaction.payment_method,
+            card_number:
+              transaction.respond_to?(:card_number) ?
+                transaction.card_number :
+                nil,
 
-        card_number:
-          transaction.respond_to?(:card_number) ?
-            transaction.card_number :
-            nil,
+            account_id:
+              transaction.account_id,
 
-        account_id:
-          transaction.account_id,
+            account_name:
+              transaction.account&.bank&.name,
 
-        account_name:
-          transaction.account&.bank&.name,
-
-        account_number:
-          transaction.account&.account_number
-      }
-    end
+            account_number:
+              transaction.account&.account_number
+          }
+        end
 
     render json: {
-      year: year,
+      year:
+        year,
 
       personal:
         build_history_summary(
@@ -161,7 +168,8 @@ class PersonalTransactionsController < ApplicationController
           year
         ),
 
-      transactions: transaction_list
+      transactions:
+        transaction_list
     }
   end
 
@@ -192,17 +200,73 @@ class PersonalTransactionsController < ApplicationController
   end
 
   def year_date_range(year)
-    Date.new(year, 1, 1)..Date.new(year, 12, 31)
+    Date.new(
+      year,
+      1,
+      1
+    )..
+    Date.new(
+      year,
+      12,
+      31
+    )
   end
 
   def current_month_date_range(today)
-    today.beginning_of_month..today.end_of_month
+    today.beginning_of_month..
+      today.end_of_month
+  end
+
+  def current_week_date_range(today)
+    today.beginning_of_week(:monday)..
+      today.end_of_week(:sunday)
+  end
+
+  def current_day_date_range(today)
+    today..today
+  end
+
+  def category_period_transactions(
+    transactions,
+    period,
+    year,
+    today
+  )
+    case period
+    when "year"
+      transactions.where(
+        date:
+          year_date_range(year)
+      )
+
+    when "month"
+      transactions.where(
+        date:
+          current_month_date_range(today)
+      )
+
+    when "week"
+      transactions.where(
+        date:
+          current_week_date_range(today)
+      )
+
+    when "today"
+      transactions.where(
+        date:
+          current_day_date_range(today)
+      )
+
+    else
+      transactions
+    end
   end
 
   def build_summary(
     transactions,
     year,
-    today
+    today,
+    category_period = "all"
   )
     current_month_transactions =
       transactions.where(
@@ -214,6 +278,14 @@ class PersonalTransactionsController < ApplicationController
       transactions.where(
         date:
           year_date_range(year)
+      )
+
+    category_transactions =
+      category_period_transactions(
+        transactions,
+        category_period,
+        year,
+        today
       )
 
     {
@@ -240,7 +312,7 @@ class PersonalTransactionsController < ApplicationController
 
       category_expense:
         build_category_expense(
-          year_transactions
+          category_transactions
         )
     }
   end
@@ -292,9 +364,14 @@ class PersonalTransactionsController < ApplicationController
         .sum(:amount)
 
     {
-      income: income,
-      expense: expense,
-      balance: income - expense
+      income:
+        income,
+
+      expense:
+        expense,
+
+      balance:
+        income - expense
     }
   end
 
@@ -325,10 +402,17 @@ class PersonalTransactionsController < ApplicationController
         )
 
       {
-        month: month,
-        income: summary[:income],
-        expense: summary[:expense],
-        balance: summary[:balance]
+        month:
+          month,
+
+        income:
+          summary[:income],
+
+        expense:
+          summary[:expense],
+
+        balance:
+          summary[:balance]
       }
     end
   end
@@ -344,8 +428,11 @@ class PersonalTransactionsController < ApplicationController
       .sum(:amount)
       .map do |category, amount|
         {
-          category: category,
-          amount: amount
+          category:
+            category,
+
+          amount:
+            amount
         }
       end
       .sort_by do |item|

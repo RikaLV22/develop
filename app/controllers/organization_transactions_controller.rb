@@ -71,7 +71,8 @@ class OrganizationTransactionsController < ApplicationController
   end
 
   def summary
-    today = Date.current
+    today =
+      Date.current
 
     year =
       params[:year].presence&.to_i ||
@@ -79,6 +80,9 @@ class OrganizationTransactionsController < ApplicationController
 
     transactions =
       organization_transactions
+
+    category_period =
+      params[:period].presence || "all"
 
     users =
       build_user_summaries(
@@ -97,14 +101,16 @@ class OrganizationTransactionsController < ApplicationController
         build_summary(
           transactions,
           year,
-          today
+          today,
+          category_period
         ),
 
       organization_member:
         build_summary(
           member_transactions,
           year,
-          today
+          today,
+          category_period
         ),
 
       users: users
@@ -259,10 +265,19 @@ class OrganizationTransactionsController < ApplicationController
     today.beginning_of_month..today.end_of_month
   end
 
+  def current_week_date_range(today)
+    today.beginning_of_week(:monday)..today.end_of_week(:sunday)
+  end
+
+  def current_day_date_range(today)
+    today..today
+  end
+
   def build_summary(
     transactions,
     year,
-    today
+    today,
+    category_period
   )
     current_month_transactions =
       transactions.where(
@@ -274,6 +289,14 @@ class OrganizationTransactionsController < ApplicationController
       transactions.where(
         date:
           year_date_range(year)
+      )
+
+    category_transactions =
+      category_period_transactions(
+        transactions,
+        category_period,
+        year,
+        today
       )
 
     {
@@ -300,9 +323,45 @@ class OrganizationTransactionsController < ApplicationController
 
       category_expense:
         build_category_expense(
-          year_transactions
+          category_transactions
         )
     }
+  end
+
+  def category_period_transactions(
+    transactions,
+    period,
+    year,
+    today
+  )
+    case period
+    when "year"
+      transactions.where(
+        date:
+          year_date_range(year)
+      )
+
+    when "month"
+      transactions.where(
+        date:
+          current_month_date_range(today)
+      )
+
+    when "week"
+      transactions.where(
+        date:
+          current_week_date_range(today)
+      )
+
+    when "today"
+      transactions.where(
+        date:
+          current_day_date_range(today)
+      )
+
+    else
+      transactions
+    end
   end
 
   def build_history_summary(
