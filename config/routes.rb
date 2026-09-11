@@ -2,10 +2,10 @@ Rails.application.routes.draw do
   resources :users, only: [:index, :show, :new, :create, :edit, :update, :destroy]
   resources :organization_memberships, only: [:index, :create, :destroy]
 
-  get '/me', to: 'users#me'
+  get "/me", to: "users#me"
 
   resources :organizations, only: [:index, :show, :new, :create, :edit, :update, :destroy] do
-    get 'users', to: 'organizations#users'
+    get "users", to: "organizations#users"
   end
 
   resources :organization_transactions,
@@ -56,4 +56,30 @@ Rails.application.routes.draw do
 
   post "/chat", to: "chat#create"
   post "/personal_chat", to: "personal_chat#create"
+  get "/health", to: "health#show"
+  get "/maintenance/status", to: "maintenance_status#show"
+
+  namespace :admin do
+    get "dashboard", to: "dashboard#show"
+
+    resources :users, only: [:index, :show] do
+      member do
+        patch :suspend
+        patch :restore
+        post :force_logout
+      end
+    end
+
+    resources :organizations, only: [:index, :show, :destroy]
+    resources :transactions, only: [:index, :show]
+
+    get "system/status", to: "system#status"
+
+    get "maintenance", to: "maintenance#show"
+    patch "maintenance", to: "maintenance#update"
+    post "maintenance/logout_all", to: "maintenance#logout_all"
+    post "system/restart", to: "system#restart"
+  end
+
+  mount ActionCable.server => "/cable"
 end

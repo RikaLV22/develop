@@ -6,6 +6,11 @@ class User < ApplicationRecord
 
   has_secure_password
 
+  enum :role, {
+    user: 0,
+    admin: 1
+  }
+
   has_many :transactions, dependent: :destroy
   has_many :accounts, dependent: :nullify
 
@@ -25,6 +30,10 @@ class User < ApplicationRecord
   validates :public_id,
             presence: true,
             uniqueness: true
+
+  def suspended?
+    suspended_at.present?
+  end
 
   private
 

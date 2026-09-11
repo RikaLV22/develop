@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_06_094651) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_11_110030) do
   create_table "accounts", charset: "utf8mb3", force: :cascade do |t|
     t.string "account_number"
     t.string "account_scope", default: "personal", null: false
@@ -63,6 +63,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_06_094651) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "maintenance_settings", charset: "utf8mb3", force: :cascade do |t|
+    t.boolean "accounts_enabled", default: true, null: false
+    t.boolean "ai_enabled", default: true, null: false
+    t.boolean "block_login", default: false, null: false
+    t.boolean "calendar_enabled", default: true, null: false
+    t.boolean "charts_enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.string "maintenance_message"
+    t.boolean "organization_balance_chart_enabled", default: true, null: false
+    t.boolean "organization_category_chart_enabled", default: true, null: false
+    t.boolean "organization_enabled", default: true, null: false
+    t.boolean "organization_personal_balance_chart_enabled", default: true, null: false
+    t.boolean "organization_user_balance_chart_enabled", default: true, null: false
+    t.boolean "personal_balance_chart_enabled", default: true, null: false
+    t.boolean "personal_category_chart_enabled", default: true, null: false
+    t.boolean "system_maintenance", default: false, null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "organization_memberships", charset: "utf8mb3", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "organization_id", null: false
@@ -105,6 +124,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_06_094651) do
     t.bigint "organization_id", null: false
     t.string "password_digest"
     t.string "public_id"
+    t.integer "role", default: 0, null: false
+    t.datetime "suspended_at"
+    t.integer "token_version", default: 0, null: false
     t.datetime "updated_at", null: false
     t.string "username", null: false
     t.index ["organization_id"], name: "index_users_on_organization_id"
