@@ -1,118 +1,114 @@
-class HealthController < ApplicationController
-  def show
-    database_status = check_database
-    maintenance_setting = MaintenanceSetting.current
+class Admin::ApiMonitorController < ApplicationController
+  before_action :admin_user
+
+  def status
+    started_at =
+      Process.clock_gettime(
+        Process::CLOCK_MONOTONIC
+      )
+
+    db_started_at =
+      Process.clock_gettime(
+        Process::CLOCK_MONOTONIC
+      )
+
+    db_status = "normal"
+    db_error = nil
+
+    begin
+      ActiveRecord::Base.connection.select_value("SELECT 1")
+    rescue StandardError => e
+      db_status = "error"
+      db_error = e.message
+    end
+
+    db_elapsed =
+      Process.clock_gettime(
+        Process::CLOCK_MONOTONIC
+      ) - db_started_at
+
+    total_elapsed =
+      Process.clock_gettime(
+        Process::CLOCK_MONOTONIC
+      ) - started_at
+
+    backend_status =
+      if total_elapsed >= 1.0
+        "warning"
+      else
+        "normal"
+      end
+
+    user_api = check_user_api
+    organization_api = check_organization_api
+    organization_user_api = check_organization_user_api
+    personal_transaction_api = check_personal_transaction_api
+    organization_transaction_api = check_organization_transaction_api
+    personal_account_api = check_personal_account_api
+    organization_account_api = check_organization_account_api
+    bank_api = check_bank_api
+    ai_api = check_ai_api
+
+    overall_status =
+      if db_status == "error" ||
+         user_api[:status] == "error" ||
+         organization_api[:status] == "error" ||
+         organization_user_api[:status] == "error" ||
+         personal_transaction_api[:status] == "error" ||
+         organization_transaction_api[:status] == "error" ||
+         personal_account_api[:status] == "error" ||
+         organization_account_api[:status] == "error" ||
+         bank_api[:status] == "error" ||
+         ai_api[:status] == "error"
+        "error"
+      elsif backend_status == "warning" ||
+            user_api[:status] == "warning" ||
+            organization_api[:status] == "warning" ||
+            organization_user_api[:status] == "warning" ||
+            personal_transaction_api[:status] == "warning" ||
+            organization_transaction_api[:status] == "warning" ||
+            personal_account_api[:status] == "warning" ||
+            organization_account_api[:status] == "warning" ||
+            bank_api[:status] == "warning" ||
+            ai_api[:status] == "warning"
+        "warning"
+      else
+        "normal"
+      end
 
     render json: {
-      status: database_status == "ok" ? "ok" : "degraded",
-      backend: "ok",
-      database: database_status,
-      maintenance: maintenance_setting&.system_maintenance || false,
-      timestamp: Time.current.iso8601
+      status: overall_status,
+
+      backend: {
+        status: backend_status,
+        response_time_ms:
+          (total_elapsed * 1000).round(2)
+      },
+
+      database: {
+        status: db_status,
+        response_time_ms:
+          (db_elapsed * 1000).round(2),
+        error: db_error
+      },
+
+      apis: [
+        user_api,
+        organization_api,
+        organization_user_api,
+        personal_transaction_api,
+        organization_transaction_api,
+        personal_account_api,
+        organization_account_api,
+        bank_api,
+        ai_api
+      ],
+
+      generated_at: Time.current.iso8601
     }
   end
 
-  def user
-    user_api = check_user_api
-
-    if user_api[:status] == "ok"
-      render json: user_api, status: :ok
-    else
-      render json: user_api, status: :service_unavailable
-    end
-  end
-
-  def organization
-    organization_api = check_organization_api
-
-    if organization_api[:status] == "ok"
-      render json: organization_api, status: :ok
-    else
-      render json: organization_api, status: :service_unavailable
-    end
-  end
-
-  def organization_users
-    organization_user_api = check_organization_user_api
-
-    if organization_user_api[:status] == "ok"
-      render json: organization_user_api, status: :ok
-    else
-      render json: organization_user_api, status: :service_unavailable
-    end
-  end
-
-  def personal_transactions
-    personal_transaction_api = check_personal_transaction_api
-
-    if personal_transaction_api[:status] == "ok"
-      render json: personal_transaction_api, status: :ok
-    else
-      render json: personal_transaction_api, status: :service_unavailable
-    end
-  end
-
-  def organization_transactions
-    organization_transaction_api = check_organization_transaction_api
-
-    if organization_transaction_api[:status] == "ok"
-      render json: organization_transaction_api, status: :ok
-    else
-      render json: organization_transaction_api, status: :service_unavailable
-    end
-  end
-
-  def personal_accounts
-    personal_account_api = check_personal_account_api
-
-    if personal_account_api[:status] == "ok"
-      render json: personal_account_api, status: :ok
-    else
-      render json: personal_account_api, status: :service_unavailable
-    end
-  end
-
-  def organization_accounts
-    organization_account_api = check_organization_account_api
-
-    if organization_account_api[:status] == "ok"
-      render json: organization_account_api, status: :ok
-    else
-      render json: organization_account_api, status: :service_unavailable
-    end
-  end
-
-  def banks
-    bank_api = check_bank_api
-
-    if bank_api[:status] == "ok"
-      render json: bank_api, status: :ok
-    else
-      render json: bank_api, status: :service_unavailable
-    end
-  end
-
-  def ai
-    ai_api = check_ai_api
-
-    if ai_api[:status] == "ok"
-      render json: ai_api, status: :ok
-    else
-      render json: ai_api, status: :service_unavailable
-    end
-  end
-
   private
-
-  def check_database
-    ActiveRecord::Base.connection.execute("SELECT 1")
-    "ok"
-  rescue StandardError => e
-    Rails.logger.error(
-      "Health check database error: #{e.class}: #{e.message}"
-    )
-    "error"
-  end
 
   def check_user_api
     started_at =
@@ -130,7 +126,7 @@ class HealthController < ApplicationController
 
       {
         name: "User API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -142,7 +138,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check User API error: #{e.class}: #{e.message}"
+        "User API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -174,7 +170,7 @@ class HealthController < ApplicationController
 
       {
         name: "Organization API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -186,7 +182,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Organization API error: #{e.class}: #{e.message}"
+        "Organization API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -218,7 +214,7 @@ class HealthController < ApplicationController
 
       {
         name: "Organization User API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -230,7 +226,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Organization User API error: #{e.class}: #{e.message}"
+        "Organization User API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -262,7 +258,7 @@ class HealthController < ApplicationController
 
       {
         name: "Personal Transaction API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -274,7 +270,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Personal Transaction API error: #{e.class}: #{e.message}"
+        "Personal Transaction API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -306,7 +302,7 @@ class HealthController < ApplicationController
 
       {
         name: "Organization Transaction API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -318,7 +314,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Organization Transaction API error: #{e.class}: #{e.message}"
+        "Organization Transaction API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -350,7 +346,7 @@ class HealthController < ApplicationController
 
       {
         name: "Personal Account API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -362,7 +358,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Personal Account API error: #{e.class}: #{e.message}"
+        "Personal Account API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -394,7 +390,7 @@ class HealthController < ApplicationController
 
       {
         name: "Organization Account API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -406,7 +402,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Organization Account API error: #{e.class}: #{e.message}"
+        "Organization Account API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -438,7 +434,7 @@ class HealthController < ApplicationController
 
       {
         name: "Bank API",
-        status: "ok",
+        status: "normal",
         response_time_ms:
           (elapsed * 1000).round(2),
         error: nil
@@ -450,7 +446,7 @@ class HealthController < ApplicationController
         ) - started_at
 
       Rails.logger.error(
-        "Health check Bank API error: #{e.class}: #{e.message}"
+        "Bank API health check error: #{e.class}: #{e.message}"
       )
 
       {
@@ -558,12 +554,11 @@ class HealthController < ApplicationController
 
     {
       name: "AI API",
-      status: "ok",
+      status: "normal",
       response_time_ms:
         (elapsed * 1000).round(2),
       error: nil
     }
-
   rescue Faraday::TimeoutError => e
     elapsed =
       Process.clock_gettime(
@@ -571,7 +566,7 @@ class HealthController < ApplicationController
       ) - started_at
 
     Rails.logger.error(
-      "Health check AI API timeout: #{e.class}: #{e.message}"
+      "AI API health check timeout: #{e.class}: #{e.message}"
     )
 
     {
@@ -584,7 +579,6 @@ class HealthController < ApplicationController
         message: e.message
       }
     }
-
   rescue Faraday::ConnectionFailed => e
     elapsed =
       Process.clock_gettime(
@@ -592,7 +586,7 @@ class HealthController < ApplicationController
       ) - started_at
 
     Rails.logger.error(
-      "Health check AI API connection error: #{e.class}: #{e.message}"
+      "AI API health check connection error: #{e.class}: #{e.message}"
     )
 
     {
@@ -605,7 +599,6 @@ class HealthController < ApplicationController
         message: e.message
       }
     }
-
   rescue JSON::ParserError => e
     elapsed =
       Process.clock_gettime(
@@ -613,7 +606,7 @@ class HealthController < ApplicationController
       ) - started_at
 
     Rails.logger.error(
-      "Health check AI API JSON error: #{e.class}: #{e.message}"
+      "AI API health check JSON error: #{e.class}: #{e.message}"
     )
 
     {
@@ -626,7 +619,6 @@ class HealthController < ApplicationController
         message: e.message
       }
     }
-
   rescue StandardError => e
     elapsed =
       Process.clock_gettime(
@@ -634,7 +626,7 @@ class HealthController < ApplicationController
       ) - started_at
 
     Rails.logger.error(
-      "Health check AI API error: #{e.class}: #{e.message}"
+      "AI API health check error: #{e.class}: #{e.message}"
     )
 
     {

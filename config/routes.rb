@@ -56,7 +56,34 @@ Rails.application.routes.draw do
 
   post "/chat", to: "chat#create"
   post "/personal_chat", to: "personal_chat#create"
+  
   get "/health", to: "health#show"
+  get "/health/user", to: "health#user", as: :health_user
+  get "/health/organization",
+      to: "health#organization",
+      as: :health_organization
+  get "/health/organization_users",
+      to: "health#organization_users",
+      as: :health_organization_users
+  get "/health/personal_transactions",
+      to: "health#personal_transactions",
+      as: :health_personal_transactions
+  get "/health/organization_transactions",
+      to: "health#organization_transactions",
+      as: :health_organization_transactions
+  get "/health/personal_accounts",
+      to: "health#personal_accounts",
+      as: :health_personal_accounts
+  get "/health/organization_accounts",
+    to: "health#organization_accounts",
+    as: :health_organization_accounts
+  get "/health/banks",
+    to: "health#banks",
+    as: :health_banks
+  get "/health/ai",
+    to: "health#ai",
+    as: :health_ai
+
   get "/maintenance/status", to: "maintenance_status#show"
 
   namespace :admin do
@@ -78,7 +105,12 @@ Rails.application.routes.draw do
     get "maintenance", to: "maintenance#show"
     patch "maintenance", to: "maintenance#update"
     post "maintenance/logout_all", to: "maintenance#logout_all"
+    
     post "system/restart", to: "system#restart"
+
+    get "api_monitor",
+      to: "api_monitor#status",
+      as: :admin_api_monitor
   end
 
   mount ActionCable.server => "/cable"
