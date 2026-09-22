@@ -8,25 +8,148 @@ class Admin::MaintenanceController < ApplicationController
   def update
     maintenance = MaintenanceSetting.current
 
+    logout_count = 0
+    logout_reason = nil
+    changed_fields = []
+
     ActiveRecord::Base.transaction do
-      system_maintenance_changed =
-        maintenance.system_maintenance !=
-        maintenance_params[:system_maintenance]
+      params_data = maintenance_params
 
-      block_login_changed =
-        maintenance.block_login !=
-        maintenance_params[:block_login]
+      # 更新前の値を保存
+      before_system_maintenance =
+        maintenance.system_maintenance
 
+      before_block_login =
+        maintenance.block_login
+
+      # どの設定が変わったか確認
+      if before_system_maintenance !=
+         params_data[:system_maintenance]
+        changed_fields << "システムメンテナンス"
+      end
+
+      if before_block_login !=
+         params_data[:block_login]
+        changed_fields << "新規ログイン停止"
+      end
+
+      if maintenance.maintenance_message !=
+         params_data[:maintenance_message]
+        changed_fields << "メンテナンスメッセージ"
+      end
+
+      if params_data.key?(:calendar_enabled) &&
+         maintenance.calendar_enabled !=
+         params_data[:calendar_enabled]
+        changed_fields << "カレンダー"
+      end
+
+      if params_data.key?(:charts_enabled) &&
+         maintenance.charts_enabled !=
+         params_data[:charts_enabled]
+        changed_fields << "グラフ"
+      end
+
+      if params_data.key?(:accounts_enabled) &&
+         maintenance.accounts_enabled !=
+         params_data[:accounts_enabled]
+        changed_fields << "口座"
+      end
+
+      if params_data.key?(:organization_enabled) &&
+         maintenance.organization_enabled !=
+         params_data[:organization_enabled]
+        changed_fields << "組織"
+      end
+
+      if params_data.key?(:ai_enabled) &&
+         maintenance.ai_enabled !=
+         params_data[:ai_enabled]
+        changed_fields << "AI"
+      end
+
+      if params_data.key?(:personal_balance_chart_enabled) &&
+         maintenance.personal_balance_chart_enabled !=
+         params_data[:personal_balance_chart_enabled]
+        changed_fields << "自分の収支推移"
+      end
+
+      if params_data.key?(:personal_category_chart_enabled) &&
+         maintenance.personal_category_chart_enabled !=
+         params_data[:personal_category_chart_enabled]
+        changed_fields << "自分の支出カテゴリ"
+      end
+
+      if params_data.key?(:organization_balance_chart_enabled) &&
+         maintenance.organization_balance_chart_enabled !=
+         params_data[:organization_balance_chart_enabled]
+        changed_fields << "組織の収支推移"
+      end
+
+      if params_data.key?(:organization_personal_balance_chart_enabled) &&
+         maintenance.organization_personal_balance_chart_enabled !=
+         params_data[:organization_personal_balance_chart_enabled]
+        changed_fields << "組織メンバー収支"
+      end
+
+      if params_data.key?(:organization_category_chart_enabled) &&
+         maintenance.organization_category_chart_enabled !=
+         params_data[:organization_category_chart_enabled]
+        changed_fields << "組織の支出カテゴリ"
+      end
+
+      if params_data.key?(:organization_user_balance_chart_enabled) &&
+         maintenance.organization_user_balance_chart_enabled !=
+         params_data[:organization_user_balance_chart_enabled]
+        changed_fields << "組織ユーザー別収支"
+      end
+
+      # メンテナンス設定を更新
       maintenance.update!(
-        maintenance_params
+        params_data
       )
 
-      if system_maintenance_changed &&
+      # システムメンテナンスON
+      if before_system_maintenance !=
+         maintenance.system_maintenance &&
          maintenance.system_maintenance
-        force_logout_all_users
-      elsif block_login_changed &&
+
+        logout_reason =
+          "システムメンテナンスを有効化したため"
+
+        logout_count =
+          force_logout_all_users
+      # ログイン停止ON
+      elsif before_block_login !=
+            maintenance.block_login &&
             maintenance.block_login
-        force_logout_all_users
+
+        logout_reason =
+          "新規ログイン停止を有効化したため"
+
+        logout_count =
+          force_logout_all_users
+      end
+
+      # 設定変更ログ
+      if changed_fields.any?
+        create_admin_log(
+          action: "UPDATE_MAINTENANCE",
+          target: maintenance,
+          message:
+            "メンテナンス設定を更新しました（#{changed_fields.join('、')}）"
+        )
+      end
+
+      # 自動強制ログアウトログ
+      if logout_count > 0
+        create_admin_log(
+          action: "FORCE_LOGOUT_ALL",
+          target_type: "User",
+          target_id: nil,
+          message:
+            "#{logout_reason}。一般ユーザー#{logout_count}人を強制ログアウトしました"
+        )
       end
     end
 
@@ -43,12 +166,29 @@ class Admin::MaintenanceController < ApplicationController
   end
 
   def logout_all
-    count = force_logout_all_users
+    count = 0
+
+    ActiveRecord::Base.transaction do
+      count =
+        force_logout_all_users
+
+      create_admin_log(
+        action: "FORCE_LOGOUT_ALL",
+        target_type: "User",
+        target_id: nil,
+        message:
+          "一般ユーザー#{count}人を強制ログアウトしました"
+      )
+    end
 
     render json: {
       message: "一般ユーザーを強制ログアウトしました",
       count: count
     }
+  rescue ActiveRecord::RecordInvalid => e
+    render json: {
+      message: e.message
+    }, status: :unprocessable_entity
   end
 
   private
@@ -82,6 +222,28 @@ class Admin::MaintenanceController < ApplicationController
   def force_logout_all_users
     User.where(role: :user).update_all(
       "token_version = token_version + 1"
+    )
+  end
+
+  def create_admin_log(
+    action:,
+    target: nil,
+    target_type: nil,
+    target_id: nil,
+    message:,
+    status: "SUCCESS"
+  )
+    AdminLog.create!(
+      admin: @current_user,
+      action: action,
+      target_type:
+        target_type ||
+        target&.class&.name,
+      target_id:
+        target_id ||
+        target&.id,
+      message: message,
+      status: status
     )
   end
 

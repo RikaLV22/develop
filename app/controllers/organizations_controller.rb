@@ -144,16 +144,41 @@ class OrganizationsController < ApplicationController
       }, status: :unprocessable_entity
     end
 
-    if organization.destroy
-      render json: {
-        message: "組織を削除しました"
-      }
-    else
-      render json: {
-        error:
-          organization.errors.full_messages.join(", ")
-      }, status: :unprocessable_entity
+    ActiveRecord::Base.transaction do
+      # この組織に紐づく組織取引をすべて削除
+      Transaction
+        .where(
+          organization_id: organization.id,
+          transaction_scope: "organization"
+        )
+        .destroy_all
+
+      # 自分の所属を削除
+      organization
+        .organization_memberships
+        .where(
+          user_id: @current_user.id
+        )
+        .destroy_all
+
+      # 組織を削除
+      organization.destroy!
     end
+
+    render json: {
+      message: "組織と関連する取引データを削除しました"
+    }, status: :ok
+
+  rescue ActiveRecord::RecordNotDestroyed => e
+    render json: {
+      error: e.message
+    }, status: :unprocessable_entity
+
+  rescue ActiveRecord::InvalidForeignKey
+    render json: {
+      error:
+        "関連データが残っているため、組織を削除できません"
+    }, status: :unprocessable_entity
   end
 
   def users

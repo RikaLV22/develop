@@ -70,4 +70,27 @@ class Admin::SystemController < ApplicationController
       generated_at: Time.current.iso8601
     }, status: :accepted
   end
+
+  def errors
+    error_logs =
+      SystemErrorLog
+        .order(created_at: :desc)
+        .limit(50)
+
+    render json: error_logs.map do |error_log|
+      {
+        id: error_log.id,
+        error_code: error_log.error_code,
+        status_code: error_log.status_code,
+        exception_class: error_log.exception_class,
+        request_method: error_log.request_method,
+        path: error_log.path,
+        controller_name: error_log.controller_name,
+        action_name: error_log.action_name,
+        message: error_log.message,
+        user_id: error_log.user_id,
+        occurred_at: error_log.created_at
+      }
+    end
+  end
 end

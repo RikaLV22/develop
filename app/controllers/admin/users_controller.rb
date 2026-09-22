@@ -22,7 +22,15 @@ class Admin::UsersController < ApplicationController
       return
     end
 
-    @user.update!(suspended_at: Time.current)
+    @user.update!(
+      suspended_at: Time.current
+    )
+
+    create_admin_log(
+      action: "SUSPEND",
+      target: @user,
+      message: "ユーザー #{@user.username} を停止しました"
+    )
 
     render json: {
       message: "ユーザーを停止しました",
@@ -35,7 +43,15 @@ class Admin::UsersController < ApplicationController
   end
 
   def restore
-    @user.update!(suspended_at: nil)
+    @user.update!(
+      suspended_at: nil
+    )
+
+    create_admin_log(
+      action: "RESTORE",
+      target: @user,
+      message: "ユーザー #{@user.username} を復元しました"
+    )
 
     render json: {
       message: "ユーザーを復元しました",
@@ -52,6 +68,12 @@ class Admin::UsersController < ApplicationController
       token_version: @user.token_version + 1
     )
 
+    create_admin_log(
+      action: "FORCE_LOGOUT",
+      target: @user,
+      message: "ユーザー #{@user.username} を強制ログアウトしました"
+    )
+
     render json: {
       message: "ユーザーを強制ログアウトしました",
       user: user_json(@user)
@@ -66,6 +88,17 @@ class Admin::UsersController < ApplicationController
 
   def set_user
     @user = User.find(params[:id])
+  end
+
+  def create_admin_log(action:, target:, message:, status: "SUCCESS")
+    AdminLog.create!(
+      admin: @current_user,
+      action: action,
+      target_type: target.class.name,
+      target_id: target.id,
+      message: message,
+      status: status
+    )
   end
 
   def user_json(user, detailed: false)

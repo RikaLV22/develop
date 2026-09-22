@@ -4,16 +4,40 @@ class PersonalTransactionsController < ApplicationController
   def index
     transactions =
       personal_transactions
-        .includes(:user)
-        .order(date: :desc, id: :desc)
+        .includes(
+          user: [
+            :avatar_attachment,
+            :background_image_attachment
+          ]
+        )
+        .order(
+          date: :desc,
+          id: :desc
+        )
 
-    render json: transactions.as_json(
-      include: {
-        user: {
-          only: [:id, :username]
-        }
-      }
-    )
+    result =
+      transactions.map do |transaction|
+        user = transaction.user
+
+        data = transaction.as_json
+
+        data["user"] =
+          if user
+            {
+              id: user.id,
+              username: user.username,
+              avatar_url: avatar_url(user),
+              background_image_url: background_image_url(user),
+              public_id: user.public_id
+            }
+          else
+            nil
+          end
+
+        data
+      end
+
+    render json: result
   end
 
   def show
@@ -438,5 +462,17 @@ class PersonalTransactionsController < ApplicationController
       .sort_by do |item|
         -item[:amount]
       end
+  end
+
+  def avatar_url(user)
+    return nil unless user.avatar.attached?
+
+    url_for(user.avatar)
+  end
+
+  def background_image_url(user)
+    return nil unless user.background_image.attached?
+
+    url_for(user.background_image)
   end
 end

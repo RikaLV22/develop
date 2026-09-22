@@ -36,7 +36,18 @@ class Admin::OrganizationsController < ApplicationController
       return
     end
 
-    @organization.destroy!
+    ActiveRecord::Base.transaction do
+      organization_name = @organization.name
+
+      @organization.destroy!
+
+      create_admin_log(
+        action: "DELETE_ORGANIZATION",
+        target_type: "Organization",
+        target_id: @organization.id,
+        message: "組織 #{organization_name} を削除しました"
+      )
+    end
 
     render json: {
       message: "組織を削除しました"
@@ -51,6 +62,23 @@ class Admin::OrganizationsController < ApplicationController
 
   def set_organization
     @organization = Organization.find(params[:id])
+  end
+
+  def create_admin_log(
+    action:,
+    target_type:,
+    target_id:,
+    message:,
+    status: "SUCCESS"
+  )
+    AdminLog.create!(
+      admin: @current_user,
+      action: action,
+      target_type: target_type,
+      target_id: target_id,
+      message: message,
+      status: status
+    )
   end
 
   def organization_json(
@@ -70,11 +98,18 @@ class Admin::OrganizationsController < ApplicationController
       name: organization.name,
       public_id: organization.public_id,
       created_at: organization.created_at,
+
       member_count: member_count,
       transaction_count: transaction_count,
+
+      empty: organization.empty?,
+      empty_since_at: organization.empty_since_at,
+      auto_delete_at: organization.auto_delete_at,
+      auto_delete_days_remaining:
+        organization.auto_delete_days_remaining,
+
       deletable:
-        member_count.zero? &&
-        transaction_count.zero?
+        member_count.zero?
     }
 
     if detailed

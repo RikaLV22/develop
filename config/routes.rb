@@ -101,16 +101,21 @@ Rails.application.routes.draw do
     resources :transactions, only: [:index, :show]
 
     get "system/status", to: "system#status"
+    get "system/errors", to: "system#errors"
 
     get "maintenance", to: "maintenance#show"
     patch "maintenance", to: "maintenance#update"
     post "maintenance/logout_all", to: "maintenance#logout_all"
-    
+
     post "system/restart", to: "system#restart"
 
     get "api_monitor",
-      to: "api_monitor#status",
-      as: :admin_api_monitor
+        to: "api_monitor#status",
+        as: :admin_api_monitor
+
+    get "logs",
+        to: "logs#index",
+        as: :logs
   end
 
   mount ActionCable.server => "/cable"

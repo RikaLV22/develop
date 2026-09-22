@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_11_110030) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_22_101143) do
   create_table "accounts", charset: "utf8mb3", force: :cascade do |t|
     t.string "account_number"
     t.string "account_scope", default: "personal", null: false
@@ -55,6 +55,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_11_110030) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "admin_logs", charset: "utf8mb3", force: :cascade do |t|
+    t.string "action", null: false
+    t.bigint "admin_id", null: false
+    t.datetime "created_at", null: false
+    t.text "message", null: false
+    t.string "status", default: "SUCCESS", null: false
+    t.integer "target_id"
+    t.string "target_type"
+    t.datetime "updated_at", null: false
+    t.index ["admin_id"], name: "index_admin_logs_on_admin_id"
+    t.index ["created_at"], name: "index_admin_logs_on_created_at"
+    t.index ["target_type", "target_id"], name: "index_admin_logs_on_target_type_and_target_id"
+  end
+
   create_table "banks", charset: "utf8mb3", force: :cascade do |t|
     t.string "bank"
     t.string "code"
@@ -94,10 +108,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_11_110030) do
 
   create_table "organizations", charset: "utf8mb3", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "empty_since_at"
     t.string "name"
     t.string "public_id"
     t.datetime "updated_at", null: false
+    t.index ["empty_since_at"], name: "index_organizations_on_empty_since_at"
     t.index ["public_id"], name: "index_organizations_on_public_id", unique: true
+  end
+
+  create_table "system_error_logs", charset: "utf8mb3", force: :cascade do |t|
+    t.string "action_name"
+    t.text "backtrace"
+    t.string "controller_name"
+    t.datetime "created_at", null: false
+    t.string "error_code", null: false
+    t.string "exception_class"
+    t.text "message", null: false
+    t.string "path", null: false
+    t.string "request_method", null: false
+    t.integer "status_code", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id"
+    t.index ["created_at"], name: "index_system_error_logs_on_created_at"
+    t.index ["error_code"], name: "index_system_error_logs_on_error_code"
+    t.index ["status_code"], name: "index_system_error_logs_on_status_code"
+    t.index ["user_id"], name: "index_system_error_logs_on_user_id"
   end
 
   create_table "transactions", charset: "utf8mb3", force: :cascade do |t|
@@ -138,8 +173,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_11_110030) do
   add_foreign_key "accounts", "users"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "admin_logs", "users", column: "admin_id"
   add_foreign_key "organization_memberships", "organizations"
   add_foreign_key "organization_memberships", "users"
+  add_foreign_key "system_error_logs", "users"
   add_foreign_key "transactions", "accounts"
   add_foreign_key "transactions", "organizations"
   add_foreign_key "transactions", "users"

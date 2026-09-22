@@ -1,26 +1,31 @@
-development:
+default: &default
   adapter: mysql2
   encoding: utf8
   pool: 5
   username: develop-user3
   password: password3
   host: localhost
-  database: example_development
+
+development:
+  primary:
+    <<: *default
+    database: example_development
+
+  queue:
+    <<: *default
+    database: example_development_queue
+    migrations_paths: db/queue_migrate
 
 test:
-  adapter: mysql2
-  encoding: utf8
-  pool: 5
-  username: develop-user3
-  password: password3
-  host: localhost
+  <<: *default
   database: example_test
 
 production:
-  adapter: mysql2
-  encoding: utf8
-  pool: 5
-  username: develop-user3
-  password: password3
-  host: localhost
-  database: example_production
+  primary:
+    <<: *default
+    database: example_production
+
+  queue:
+    <<: *default
+    database: example_production_queue
+    migrations_paths: db/queue_migrate
