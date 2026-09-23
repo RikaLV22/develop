@@ -33,3 +33,6 @@
 
 # Prometheus data
 /data/
+
+# Prometheus binary
+prometheus-*.tar.gz
