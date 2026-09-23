@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_22_101143) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_23_064516) do
   create_table "accounts", charset: "utf8mb3", force: :cascade do |t|
     t.string "account_number"
     t.string "account_scope", default: "personal", null: false
@@ -67,6 +67,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_101143) do
     t.index ["admin_id"], name: "index_admin_logs_on_admin_id"
     t.index ["created_at"], name: "index_admin_logs_on_created_at"
     t.index ["target_type", "target_id"], name: "index_admin_logs_on_target_type_and_target_id"
+  end
+
+  create_table "api_maintenance_settings", charset: "utf8mb3", force: :cascade do |t|
+    t.string "api_name", null: false
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.text "maintenance_message"
+    t.datetime "updated_at", null: false
+    t.index ["api_name"], name: "index_api_maintenance_settings_on_api_name", unique: true
   end
 
   create_table "banks", charset: "utf8mb3", force: :cascade do |t|

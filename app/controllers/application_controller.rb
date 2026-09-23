@@ -3,6 +3,7 @@ class ApplicationController < ActionController::API
 
   before_action :authorized
   before_action :check_system_maintenance
+  before_action :check_api_maintenance
 
   def authorized
     return render_unauthorized unless logged_in_user
@@ -39,6 +40,30 @@ class ApplicationController < ActionController::API
     render json: {
       message: '管理者権限が必要です'
     }, status: :forbidden
+  end
+
+  def check_api_maintenance
+    api_name = api_maintenance_name_for_request
+
+    # 対象APIでなければ何もしない
+    return unless api_name
+
+    # 管理者はメンテナンス中でもアクセス可能
+    return if current_user&.admin?
+
+    setting =
+      ApiMaintenanceSetting.find_by(
+        api_name: api_name
+      )
+
+    # 設定が存在しない、または有効なら通常処理
+    return if setting.nil? || setting.enabled?
+
+    render json: {
+      message:
+        setting.maintenance_message.presence ||
+        "#{api_name} は現在メンテナンス中です"
+    }, status: :service_unavailable
   end
 
   private
@@ -129,6 +154,39 @@ class ApplicationController < ActionController::API
     else
       "HTTP_#{status_code}"
     end
+  end
+
+  def api_maintenance_name_for_request
+    path = request.path
+
+    return "User API" if
+      path.match?(%r{\A/(users|me)(/|\z)})
+
+    return "Organization User API" if
+      path.match?(%r{\A/organizations/[^/]+/users(/|\z)})
+
+    return "Organization API" if
+      path.match?(%r{\A/organizations(/|\z)})
+
+    return "Personal Transaction API" if
+      path.match?(%r{\A/personal_transactions(/|\z)})
+
+    return "Organization Transaction API" if
+      path.match?(%r{\A/organization_transactions(/|\z)})
+
+    return "Personal Account API" if
+      path.match?(%r{\A/personal_accounts(/|\z)})
+
+    return "Organization Account API" if
+      path.match?(%r{\A/organization_accounts(/|\z)})
+
+    return "Bank API" if
+      path.match?(%r{\A/banks(/|\z)})
+
+    return "AI API" if
+      path.match?(%r{\A/(chat|personal_chat)(/|\z)})
+
+    nil
   end
 
   def check_system_maintenance

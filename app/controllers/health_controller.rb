@@ -102,6 +102,27 @@ class HealthController < ApplicationController
     end
   end
 
+  def ai_status
+    setting =
+      ApiMaintenanceSetting.find_by(
+        api_name: "AI API"
+      )
+
+    enabled =
+      setting.nil? ? true : setting.enabled?
+
+    render json: {
+      name: "AI API",
+      enabled: enabled,
+      status: enabled ? "online" : "offline",
+      maintenance: !enabled,
+      maintenance_message:
+        setting&.maintenance_message,
+      updated_at:
+        setting&.updated_at
+    }, status: :ok
+  end
+
   private
 
   def check_database

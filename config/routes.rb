@@ -83,6 +83,8 @@ Rails.application.routes.draw do
   get "/health/ai",
     to: "health#ai",
     as: :health_ai
+  get "health/ai/status",
+    to: "health#ai_status"
 
   get "/maintenance/status", to: "maintenance_status#show"
 
@@ -112,10 +114,16 @@ Rails.application.routes.draw do
     get "api_monitor",
         to: "api_monitor#status",
         as: :admin_api_monitor
+    patch "api_monitor/maintenance",
+      to: "api_monitor#update_maintenance",
+      as: :admin_api_monitor_maintenance
 
     get "logs",
         to: "logs#index",
         as: :logs
+
+    get "resources", 
+      to: "resources#show"
   end
 
   mount ActionCable.server => "/cable"
