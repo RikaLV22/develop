@@ -36,3 +36,5 @@
 
 # Prometheus binary
 prometheus-*.tar.gz
+
+.my.cnf

@@ -3,6 +3,7 @@ require "fileutils"
 desc "Start Rails server with Solid Queue"
 task :ss do
   ENV["SOLID_QUEUE_IN_PUMA"] = "true"
+
   exec "bin/rails server"
 end
 
@@ -22,9 +23,16 @@ task :sss do
     "~/node_exporter/node_exporter"
   )
 
+  mysql_exporter = "/usr/local/bin/mysqld_exporter"
+
+  mysql_config = File.expand_path(
+    ".my.cnf"
+  )
+
   prometheus_pid = nil
   exporter_pid = nil
   node_exporter_pid = nil
+  mysql_exporter_pid = nil
   rails_pid = nil
 
   begin
@@ -52,6 +60,13 @@ task :sss do
       err: :out
     )
 
+    mysql_exporter_pid = Process.spawn(
+      mysql_exporter,
+      "--config.my-cnf=#{mysql_config}",
+      out: "log/mysqld_exporter.log",
+      err: :out
+    )
+
     sleep 1
 
     rails_pid = Process.spawn(
@@ -72,7 +87,8 @@ task :sss do
     [
       prometheus_pid,
       exporter_pid,
-      node_exporter_pid
+      node_exporter_pid,
+      mysql_exporter_pid
     ].each do |pid|
       next unless pid
 
@@ -85,7 +101,8 @@ task :sss do
     [
       prometheus_pid,
       exporter_pid,
-      node_exporter_pid
+      node_exporter_pid,
+      mysql_exporter_pid
     ].each do |pid|
       next unless pid
 

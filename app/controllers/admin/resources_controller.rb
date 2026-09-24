@@ -29,6 +29,17 @@ module Admin
         api_requests_in_progress:
           api_requests_in_progress(prometheus),
 
+        mysql: {
+          connections:
+            prometheus.scalar(mysql_connections_query),
+
+          queries_per_second:
+            prometheus.scalar(mysql_queries_per_second_query),
+
+          innodb_buffer_pool_pages:
+            mysql_innodb_buffer_pool_pages(prometheus)
+        },
+
         targets:
           target_status(prometheus),
 
@@ -59,14 +70,20 @@ module Admin
     def cpu_usage_query
       <<~PROMQL
         100 * (
-          1 -
-          avg(
+          sum(
             rate(
               node_cpu_seconds_total{
                 job="node",
-                mode="idle"
+                mode!="idle"
               }[1m]
             )
+          )
+          /
+          count(
+            node_cpu_seconds_total{
+              job="node",
+              mode="idle"
+            }
           )
         )
       PROMQL
@@ -173,6 +190,47 @@ module Admin
         end
     end
 
+    def mysql_connections_query
+      <<~PROMQL
+        sum(
+          mysql_global_status_threads_connected{
+            job="mysql"
+          }
+        )
+      PROMQL
+    end
+
+    def mysql_queries_per_second_query
+      <<~PROMQL
+        sum(
+          rate(
+            mysql_global_status_queries{
+              job="mysql"
+            }[1m]
+          )
+        )
+      PROMQL
+    end
+
+    def mysql_innodb_buffer_pool_pages(prometheus)
+      prometheus
+        .vector(<<~PROMQL)
+          mysql_global_status_buffer_pool_pages{
+            job="mysql"
+          }
+        PROMQL
+        .filter_map do |item|
+          state = item[:metric]["state"]
+
+          next if state.blank?
+
+          {
+            state: state,
+            pages: item[:value]
+          }
+        end
+    end
+
     def target_status(prometheus)
       prometheus
         .vector("up")
@@ -248,6 +306,33 @@ module Admin
             end_time: end_time,
             step: "15s"
           )
+        ),
+
+        mysql_connections: normalize_single_series(
+          prometheus.matrix(
+            mysql_connections_query,
+            start_time: start_time,
+            end_time: end_time,
+            step: "15s"
+          )
+        ),
+
+        mysql_queries: normalize_single_series(
+          prometheus.matrix(
+            mysql_queries_per_second_query,
+            start_time: start_time,
+            end_time: end_time,
+            step: "15s"
+          )
+        ),
+
+        mysql_innodb_buffer_pool: normalize_mysql_state_series(
+          prometheus.matrix(
+            mysql_innodb_buffer_pool_query,
+            start_time: start_time,
+            end_time: end_time,
+            step: "15s"
+          )
         )
       }
     end
@@ -313,6 +398,14 @@ module Admin
       PROMQL
     end
 
+    def mysql_innodb_buffer_pool_query
+      <<~PROMQL
+        mysql_global_status_buffer_pool_pages{
+          job="mysql"
+        }
+      PROMQL
+    end
+
     def normalize_single_series(series)
       item = series.first
 
@@ -332,6 +425,21 @@ module Admin
 
           {
             feature: feature,
+            values: item[:values]
+              .reject { |point| point[:value].nan? }
+          }
+        end
+    end
+
+    def normalize_mysql_state_series(series)
+      series
+        .filter_map do |item|
+          state = item[:metric]["state"]
+
+          next if state.blank?
+
+          {
+            state: state,
             values: item[:values]
               .reject { |point| point[:value].nan? }
           }
